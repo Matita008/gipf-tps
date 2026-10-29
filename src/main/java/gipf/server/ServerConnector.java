@@ -1,35 +1,36 @@
 package gipf.server;
 
 import gipf.shared.Events;
-import lombok.*;
 
 import java.io.*;
 import java.net.*;
-import java.util.*;
-import java.util.concurrent.atomic.*;
+import java.util.LinkedList;
+import java.util.Queue;
+import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.*;
 
-public class ServerConnector extends Thread {
+public class ServerConnector {
+    private static final ThreadLocal<ServerConnector> netThreads = new ThreadLocal<>();
     private static final AtomicBoolean active = new AtomicBoolean(false);
-    private static int count = 0;
+    private final AtomicBoolean connActive = new AtomicBoolean(true);
     @Getter private static Thread listener;
-    private static final ThreadGroup tg = new ThreadGroup("connection-receiver");
     private final ObjectInputStream ois;
     private final ObjectOutputStream oii;
     private final Queue<Events.Event> qin = new LinkedList<>();
+    public GameRoom room;
 
     public ServerConnector(Socket s) throws IOException {
-        super(tg, "network-handler-" + (count++));
-
         var out = s.getOutputStream();
         oii = new ObjectOutputStream(new BufferedOutputStream(out));
         oii.flush();
         out.flush(); // force flush
         ois = new ObjectInputStream(new BufferedInputStream(s.getInputStream()));
+        netThreads.set(this);
     }
 
     public static void init(ServerSocket sock) throws IOException {
         if (active.getAndSet(true)) {
-            throw new IllegalStateException("Listening thread already running");
+            throw new IllegalStateException("Listener thread already running");
         }
         sock.setSoTimeout(1000); // 1s
 
@@ -37,14 +38,13 @@ public class ServerConnector extends Thread {
             while (active.get()) {
                 try {
                     Socket inbound = sock.accept();
-                    if (inbound == null) throw new Exception("nope");
+                    if (inbound == null) continue;
 
                     //TODO: explain/thinker
+                    // this is needed so that reads may timeout if there is no data (to allow sending multiple events before receiving a response)
                     inbound.setSoTimeout(100); //.1s blocking max
 
-                    ServerConnector conn = new ServerConnector(inbound);
-                    conn.manageEvent(Events.TEST_SERVER); //TODO: testing only (see poolEvent() comment on DuplicatedCode)
-                    conn.start();
+                    ServerPool.addConnection(new ServerConnector(inbound));
                 } catch (Exception ignored) {} /* TODO: should only ignore some, the others should be logged */
             }
         }, "network-thread-connector");
@@ -52,80 +52,92 @@ public class ServerConnector extends Thread {
         listener.start();
     }
 
-    public void quit() {
-        if (active.getAndSet(false)) listener.interrupt();
-        qin.clear();
+    /**
+     * Runs a runnable in a new thread with the same connector as the one from the current thread
+     * @param r the runnable to run
+     * @return the thread that runs the runnable (not started)
+     */
+    public static Thread runDeferred(Runnable r) {
+        ServerConnector sth = netThreads.get();
+        return new Thread(() -> {
+            netThreads.set(sth);
+            r.run();
+        });
     }
 
-    /** add an event to the list that are sent to the server */
-    public void manageEvent(Events.EventHandler<?> event) {
-        event.addHandler(data -> handleEvent(event.code(), data));
+    /**
+     * Runs a runnable in the current thread with the connector set to {@code this}
+     * @param r the runnable to run
+     */
+    public void run(Runnable r) {
+        ServerConnector sth = netThreads.get();
+        netThreads.set(this);
+        r.run();
+        netThreads.set(sth);
     }
 
-    void handleEvent(int code, Object data) {
+    public static ServerConnector getCurrentConnector() {
+        return netThreads.get();
+    }
+
+    /**
+     * Makes an event be forwarded to the client(s)
+     *
+     * @param event the event type to forward
+     * @param broadcastToRoom if true and in a room, the event is broadcasted to all clients in the same game room,
+     *                         otherwise it's only sent to the client connected with the current thread
+     */
+    public static void manageEvent(Events.EventHandler<?> event, boolean broadcastToRoom) {
+        event.addHandler(data -> handleEvent(event.code(), data, broadcastToRoom));
+    }
+
+    private static void handleEvent(int code, Object data, boolean broadcastToRoom) {
         Events.Event e = new Events.Event(code, data);
-        qin.add(e);
-    }
 
-    @Override
-    public void run() {
-        while (active.get()) {
-            try {
-                poolEvent();
-            } catch (SocketException se) {
-                System.out.println("Client disconnected!...");
-                return;
-            } catch (Exception e) {
-                System.out.println("error in th " + getName() + ": " + e.getLocalizedMessage());
-                e.printStackTrace(System.err);
-            }
+        ServerConnector sth = netThreads.get();
+        if (sth == null) return;
+
+        sth.qin.add(e);
+        if (broadcastToRoom && sth.room != null) {
+            sth.room.getOtherPlayer(sth).qin.add(e);
         }
     }
 
     @SuppressWarnings("DuplicatedCode") //need a bit of though (ThreadLocal with id to filter as events are run on caller thread?)
-    private void poolEvent() throws IOException {
-        boolean didSomething = false;
-        { // scoped so the jvm may reclaim it a bit early
-            Events.Event event = qin.peek();
-            if (event != null) {
-                didSomething = true;
-                qin.remove();
-                //oii.writeBoolean(true);
-                oii.writeObject(event);
-                oii.flush();
-                System.out.println("sent!");
+    boolean poolEvents() throws IOException {
+        try {
+            boolean didSomething = false;
+            { // scoped so the jvm may reclaim it a bit early
+                Events.Event event = qin.peek();
+                if (event != null) {
+                    if (ServerMain.debugPackets) System.out.println("[NET] sending: " + event);
+                    didSomething = true;
+                    qin.remove();
+                    oii.writeObject(event);
+                    oii.flush();
+                }
             }
-        }
 
-        try {/*
-            if (ois.readBoolean()) {
-                didSomething = true;
-                System.out.println("DB: avail data");
-                Events.TEST_SERVER.fire("server: data");
-            } else {
-                System.out.println("[DBG] readBool returned false");
-            }*/
-
-            Object data = ois.readObject();
-            didSomething = true;
-
-            if (!(data instanceof Events.Event(int code, Object event))) {
-                return; //TODO: how? (mitm)
-            }
-            Events.getEventByCode(code).fireUnsafe(event);
-
-            Events.TEST_SERVER.fire("server: data");
-        } catch (SocketTimeoutException | EOFException ignored) {
-            //no data available
-        } catch (ClassNotFoundException ex) {
-            throw new AssertionError(ex);
-        }
-
-        if (!didSomething) {
-            Thread.onSpinWait();
             try {
-                Thread.sleep(100);
-            } catch (InterruptedException ignored) { }
+                Object data = ois.readObject();
+                didSomething = true;
+
+                if (!(data instanceof Events.Event(int code, Object event))) {
+                    throw new AssertionError(); //TODO: how? (mitm)
+                }
+                Events.getEventByCode(code).fireUnsafe(event);
+                if (ServerMain.debugPackets) System.out.println("[NET] received: " + data);
+            } catch (SocketTimeoutException | EOFException ignored) {
+                //no data available
+            } catch (ClassNotFoundException ex) {
+                throw new AssertionError(ex);
+            }
+
+            return didSomething;
+        } catch (SocketException clientDisconnected) {
+            connActive.set(false);
+            return true;
         }
     }
+
 }

@@ -7,6 +7,7 @@ import lombok.*;
 import java.net.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/// A test client with no gui and fixed events
 public class Client {
     @SneakyThrows
     public static void main(String[] args) {
@@ -21,8 +22,13 @@ public class Client {
         AtomicBoolean exit = new AtomicBoolean(true);
         Events.TEST_SERVER.addHandler(e -> exit.set(false));
 
+        Events.CLIENT_PING.fire(true);
         Events.TEST_CLIENT.fire("client: halo!");
 
         while(exit.get()) Thread.onSpinWait();
+
+        ClientConnector.close();
+        ClientConnector.shutdown();
+        System.out.println("Client exiting");
     }
 }

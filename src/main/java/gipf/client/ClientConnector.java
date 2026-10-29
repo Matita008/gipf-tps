@@ -1,16 +1,18 @@
 package gipf.client;
 
 import gipf.shared.Events;
-import lombok.*;
-import lombok.experimental.*;
+import gipf.shared.SharedConstants;
 
 import java.io.*;
 import java.net.SocketTimeoutException;
-import java.util.*;
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.*;
+import lombok.experimental.*;
 
 /**
- * Class to manage connection to the server
+ * Class to manage the connection to the server
  */
 @UtilityClass
 public class ClientConnector {
@@ -31,7 +33,7 @@ public class ClientConnector {
         ois = new ObjectInputStream(new BufferedInputStream(in));
 
         thread = new Thread(() -> {
-            while (active.get()) {
+            while (active.get() || !qin.isEmpty()) {
                 try {
                     poolEvent();
                 } catch (Exception e) {
@@ -39,38 +41,53 @@ public class ClientConnector {
                     e.printStackTrace(System.err);
                 }
             }
+            System.out.println("[NET] disconnected\n[NET]\tbye!");
         }, "network-thread-connector");
 
         thread.setDaemon(true);
         thread.start();
+
+        Events.fire(Events.CLIENT_CONNECT, SharedConstants.initPacket);
     }
 
-    public void quit() {
-        if (active.getAndSet(false)) thread.interrupt();
-        qin.clear();
+    public void close() {
+        if (!active.getAndSet(false)) return;
+        qin.add(new Events.Event(Events.CLIENT_QUIT.code(), null));
+        System.out.println("Client disconnecting; queue: " + qin.size());
     }
 
-    /** add an event to the list that are sent to the server */
+    public void shutdown() {
+        if (active.get()) throw new IllegalStateException("ClientConnector.close() was not called before shutdown()");
+        if (thread == null) return;
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        thread = null;
+    }
+
+    /** add an event to the list that is sent to the server */
     public void manageEvent(Events.EventHandler<?> event) {
         event.addHandler(data -> handleEvent(event.code(), data));
     }
 
     void handleEvent(int code, Object data) {
+        if (!active.get()) return;
         Events.Event e = new Events.Event(code, data);
         qin.add(e);
     }
 
-    private static void poolEvent() throws IOException {
+    private void poolEvent() throws IOException {
         boolean didSomething = false;
         { // scoped so the jvm may reclaim it a bit early
             Events.Event event = qin.peek();
             if (event != null) {
+                System.out.println("[NET] sending: " + event);
                 didSomething = true;
                 qin.remove();
-                //oii.writeBoolean(true);
                 oii.writeObject(event);
                 oii.flush();
-                System.out.println("sent!");
             }
         }
 
@@ -82,6 +99,7 @@ public class ClientConnector {
                 return; //TODO: how? (mitm)
             }
             Events.getEventByCode(code).fireUnsafe(event);
+            System.out.println("[NET] received: " + data);
         } catch (SocketTimeoutException | EOFException ignored) {
             //no data available
         } catch (ClassNotFoundException e) {
