@@ -4,10 +4,11 @@ import gipf.shared.Events;
 import gipf.shared.SharedConstants;
 
 import java.io.*;
-import java.net.SocketTimeoutException;
+import java.net.*;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
+
 import lombok.*;
 import lombok.experimental.*;
 
@@ -17,23 +18,31 @@ import lombok.experimental.*;
 @UtilityClass
 public class ClientConnector {
     private final AtomicBoolean active = new AtomicBoolean(false);
-    @Getter private Thread thread;
-    private ObjectInputStream ois;
-    private ObjectOutputStream oii;
-    private final Queue<Events.Event> qin = new LinkedList<>();
+    @Getter private Thread networkThread;
+    private ObjectInputStream inputStream   /* ois */;
+    private ObjectOutputStream outputStream /* oii */;
+    private final Queue<Events.Event> eventQueue = new LinkedList<>();
+    private static Socket socket;
+
+    public void init(String host, int port) throws IOException {
+        socket = new Socket(host, port);
+        socket.setSoTimeout(100); //.1s blocking max
+
+        init(socket.getInputStream(), socket.getOutputStream());
+    }
 
     public void init(InputStream in, OutputStream out) throws IOException {
         if (active.getAndSet(true)) {
             throw new IllegalStateException("Thread already running");
         }
 
-        oii = new ObjectOutputStream(new BufferedOutputStream(out));
-        oii.flush();
+        outputStream = new ObjectOutputStream(new BufferedOutputStream(out));
+        outputStream.flush();
         out.flush(); // force flush
-        ois = new ObjectInputStream(new BufferedInputStream(in));
+        inputStream = new ObjectInputStream(new BufferedInputStream(in));
 
-        thread = new Thread(() -> {
-            while (active.get() || !qin.isEmpty()) {
+        networkThread = new Thread(() -> {
+            while (active.get() || !eventQueue.isEmpty()) {
                 try {
                     poolEvent();
                 } catch (Exception e) {
@@ -44,27 +53,34 @@ public class ClientConnector {
             System.out.println("[NET] disconnected\n[NET]\tbye!");
         }, "network-thread-connector");
 
-        thread.setDaemon(true);
-        thread.start();
+        networkThread.setDaemon(true);
+        networkThread.start();
 
         Events.fire(Events.CLIENT_CONNECT, SharedConstants.initPacket);
     }
 
     public void close() {
         if (!active.getAndSet(false)) return;
-        qin.add(new Events.Event(Events.CLIENT_QUIT.code(), null));
-        System.out.println("Client disconnecting; queue: " + qin.size());
+        eventQueue.add(new Events.Event(Events.CLIENT_QUIT.code(), null));
+        System.out.println("Client disconnecting; queue: " + eventQueue.size());
     }
 
     public void shutdown() {
         if (active.get()) throw new IllegalStateException("ClientConnector.close() was not called before shutdown()");
-        if (thread == null) return;
+        if (networkThread == null) return;
         try {
-            thread.join();
+            networkThread.join();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        thread = null;
+        networkThread = null;
+        try {
+            socket.close();
+        } catch (IOException e) {
+            System.err.println("Errore nella chiusura del socket: " + e.getLocalizedMessage());
+            e.printStackTrace(System.err);
+        }
+        socket = null;
     }
 
     /** add an event to the list that is sent to the server */
@@ -75,24 +91,24 @@ public class ClientConnector {
     void handleEvent(int code, Object data) {
         if (!active.get()) return;
         Events.Event e = new Events.Event(code, data);
-        qin.add(e);
+        eventQueue.add(e);
     }
 
     private void poolEvent() throws IOException {
         boolean didSomething = false;
         { // scoped so the jvm may reclaim it a bit early
-            Events.Event event = qin.peek();
+            Events.Event event = eventQueue.peek();
             if (event != null) {
                 System.out.println("[NET] sending: " + event);
                 didSomething = true;
-                qin.remove();
-                oii.writeObject(event);
-                oii.flush();
+                eventQueue.remove();
+                outputStream.writeObject(event);
+                outputStream.flush();
             }
         }
 
         try {
-            Object data = ois.readObject();
+            Object data = inputStream.readObject();
             didSomething = true;
 
             if (!(data instanceof Events.Event(int code, Object event))) {
