@@ -43,6 +43,25 @@ public class Posizione implements Serializable {
         }
     }
 
+    public boolean isAdjacent(Posizione o) {
+        if (!isValid() || o == null || !o.isValid()) return false;
+
+        int xDiff = x > o.x ? x - o.x : o.x - x;
+        int yDiff = y > o.x ? y - o.y : o.y - y;
+
+        // the vertical connection
+        if (xDiff == 0 && yDiff == 2) return true;
+
+        // diagonal lines
+        if (false) return true;
+
+        // nothing matches, so it isn't adjacent
+        return false;
+    }
+
+
+    // -------------- Test things ----------------------
+
     ///helper (born for debugger, but it skips breakpoints)
     private static void t(int x, int y, boolean valid) {
         t(x, y, valid, false);
