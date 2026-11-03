@@ -1,0 +1,6 @@
+services:
+  gipf:
+    build:
+      context: .
+  ports:
+    - "4096:4096"
