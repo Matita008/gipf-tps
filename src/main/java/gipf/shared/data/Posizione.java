@@ -53,7 +53,7 @@ public class Posizione implements Serializable {
         if (xDiff == 0 && yDiff == 2) return true;
 
         // diagonal lines
-        if (false) return true;
+        if (xDiff == 1 && yDiff == 1) return true;
 
         // nothing matches, so it isn't adjacent
         return false;
