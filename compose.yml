@@ -2,5 +2,5 @@ services:
   gipf:
     build:
       context: .
-  ports:
-    - "4096:4096"
+    ports:
+      - "0.0.0.0:5000:4096"
