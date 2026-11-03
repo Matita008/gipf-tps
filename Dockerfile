@@ -36,6 +36,4 @@ USER gipf-server
 
 COPY --from=builder /app/build/libs/*.jar ./
 
-EXPOSE 1608
-
-ENTRYPOINT ["java", "-Dport=1608", "-jar", "server.jar"]
+ENTRYPOINT ["java", "-jar", "server.jar"]
