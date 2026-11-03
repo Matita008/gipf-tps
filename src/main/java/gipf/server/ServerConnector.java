@@ -32,6 +32,7 @@ public class ServerConnector {
         if (active.getAndSet(true)) {
             throw new IllegalStateException("Listener thread already running");
         }
+        //
         sock.setSoTimeout(1000); // 1s
 
         listener = new Thread(() -> {
@@ -40,8 +41,7 @@ public class ServerConnector {
                     Socket inbound = sock.accept();
                     if (inbound == null) continue;
 
-                    //TODO: explain/thinker
-                    // this is needed so that reads may timeout if there is no data (to allow sending multiple events before receiving a response)
+                    //imposta un tempo di attesa massimo nella ricezione di dati (se dopo .1s non è stato ricevuto niente le chiamate a ois ritornano null)
                     inbound.setSoTimeout(100); //.1s blocking max
 
                     ServerPool.addConnection(new ServerConnector(inbound));
@@ -91,7 +91,8 @@ public class ServerConnector {
         event.addHandler(data -> handleEvent(event.code(), data, broadcastToRoom));
     }
 
-    private static void handleEvent(int code, Object data, boolean broadcastToRoom) {
+    // aggiungi un evento in coda a quelli da essere inviati
+    private static void handleEvent(int code, Object data, boolean broadcastToRoom /* invia anche al compagno */) {
         Events.Event e = new Events.Event(code, data);
 
         ServerConnector sth = netThreads.get();
@@ -103,22 +104,28 @@ public class ServerConnector {
         }
     }
 
+    // metodo per inviare il primo evento dalla coda e/o ricevere un evento dal socket
     @SuppressWarnings("DuplicatedCode") //need a bit of though (ThreadLocal with id to filter as events are run on caller thread?)
     boolean poolEvents() throws IOException {
         try {
             boolean didSomething = false;
             { // scoped so the jvm may reclaim it a bit early
                 Events.Event event = qin.peek();
+                //se c'è un evento in coda da inviare
                 if (event != null) {
                     if (ServerMain.debugPackets) System.out.println("[NET] sending: " + event);
                     didSomething = true;
+                    //rimuovilo
                     qin.remove();
+                    //invialo
                     oii.writeObject(event);
+                    //assicurati che sia stato inviato
                     oii.flush();
                 }
             }
 
             try {
+                //prova a leggere dati dal socket
                 Object data = ois.readObject();
                 didSomething = true;
 
@@ -128,16 +135,16 @@ public class ServerConnector {
                 Events.getEventByCode(code).fireUnsafe(event);
                 if (ServerMain.debugPackets) System.out.println("[NET] received: " + data);
             } catch (SocketTimeoutException | EOFException ignored) {
-                //no data available
+                //non è stato ricevuto niente, prosegui normalmente
             } catch (ClassNotFoundException ex) {
                 throw new AssertionError(ex);
             }
 
             return didSomething;
         } catch (SocketException clientDisconnected) {
+            // il client si è disconnesso
             connActive.set(false);
             return true;
         }
     }
-
 }

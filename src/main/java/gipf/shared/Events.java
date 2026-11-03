@@ -74,10 +74,12 @@ public final class Events {
             hand.add(c);
         }
 
+        // lancia l'evento
         public void fire(T event) {
             hand.forEach(c -> c.accept(event));
         }
 
+        //questa funzione chiama fire, solo che disabilita il type-checking
         /*** Don't run this, as there is no type-checking at build-time */
         @SuppressWarnings("unchecked")
         public void fireUnsafe(Object event) {
