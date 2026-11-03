@@ -19,57 +19,85 @@ public class Posizione implements Serializable {
         if (x < 3) {
             int ty = y < 5 ? y : 8 - y;
             return (x + ty) > 3;
-        } else if (x < 14) {
-            return true;
-        } else {
+        } else if (x >= 14) {
             int ty = y < 5 ? y : 8 - y;
             return (16 - x + ty) > 3;
+        }
+
+        return true;
+    }
+
+    public boolean isBorder() {
+        if (!isValid()) return false;
+
+        //is in the middle part?
+        if (x > 2 && x < 14) return true;
+
+        //one of the triangles in the borders
+        if (x < 3) {
+            int ty = y < 5 ? y : 8 - y;
+            return (x + ty) == 4;
+        } else {
+            int ty = y < 5 ? y : 8 - y;
+            return (16 - x + ty) == 4;
         }
     }
 
     ///helper (born for debugger, but it skips breakpoints)
-    private static boolean c(int x, int y) {
-        return (new Posizione((short)x, (short)y)).isValid();
+    private static void t(int x, int y, boolean valid) {
+        t(x, y, valid, false);
+    }
+
+    private static void t(int x, int y, boolean valid, boolean border) {
+        var p = new Posizione((short) x, (short) y);
+
+        System.out.print("[" + x + ", " + y + "]: ");
+
+        if (p.isValid() == valid) {
+            if (p.isBorder() == border) System.out.println("ok (" + valid + ")");
+            else System.out.println("valid ok (" + valid + "), border fail (expect " + border + ")");
+        } else {
+            System.out.println("valid wrong (expect " + valid + ")");
+        }
     }
 
     /// a manual sanity test (can't be bothered with junit rn)
     public static void main(String[] args) {
-        System.out.println("false = " + c(0,0));
-        System.out.println("false = " + c(0,1));
-        System.out.println("false = " + c(0,2));
-        System.out.println("false = " + c(0,3));
-        System.out.println("true  = " + c(0,4));
-        System.out.println("false = " + c(0,5));
-        System.out.println("false = " + c(0,6));
-        System.out.println("false = " + c(0,7));
-        System.out.println("false = " + c(0,8));
+        t(0,0, false);
+        t(0,1, false);
+        t(0,2, false);
+        t(0,3, false);
+        t(0,4, true, true);
+        t(0,5, false);
+        t(0,6, false);
+        t(0,7, false);
+        t(0,8, false);
 
-        System.out.println("false = " + c(1,0));
-        System.out.println("false = " + c(1,1));
-        System.out.println("false = " + c(1,2));
-        System.out.println("true  = " + c(1,3));
-        System.out.println("false = " + c(1,4));
-        System.out.println("true  = " + c(1,5));
-        System.out.println("false = " + c(1,6));
-        System.out.println("false = " + c(1,7));
-        System.out.println("false = " + c(1,8));
+        t(1,0, false);
+        t(1,1, false);
+        t(1,2, false);
+        t(1,3, true, true);
+        t(1,4, false);
+        t(1,5, true, true);
+        t(1,6, false);
+        t(1,7, false);
+        t(1,8, false);
 
-        System.out.println("false = " + c(2,0));
-        System.out.println("false = " + c(2,1));
-        System.out.println("true  = " + c(2,2));
-        System.out.println("false = " + c(2,3));
-        System.out.println("true  = " + c(2,4));
-        System.out.println("false = " + c(2,5));
-        System.out.println("true  = " + c(2,6));
-        System.out.println("false = " + c(2,7));
-        System.out.println("false = " + c(2,8));
+        t(2,0, false);
+        t(2,1, false);
+        t(2,2, true, true);
+        t(2,3, false);
+        t(2,4, true);
+        t(2,5, false);
+        t(2,6, true, true);
+        t(2,7, false);
+        t(2,8, false);
 
-        System.out.println("false = " + c(11,0));
-        System.out.println("true  = " + c(1,1));
+        t(11,0, false);
 
-        System.out.println("false = " + c(15,4));
-        System.out.println("true  = " + c(15,5));
-        System.out.println("false = " + c(16,5));
-        System.out.println("true  = " + c(16,4));
+        t(15,4, false);
+        t(15,5, true, true);
+        t(16,5, false);
+        t(16,4, true, true);
     }
 }
