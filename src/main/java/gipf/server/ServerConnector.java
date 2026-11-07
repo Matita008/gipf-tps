@@ -14,7 +14,7 @@ public class ServerConnector {
     private static final AtomicBoolean active = new AtomicBoolean(false);
     private final AtomicBoolean connActive = new AtomicBoolean(true);
     @Getter private static Thread listener;
-    private final ObjectInputStream ois;
+    private final ObjectInputStream inputStream;
     private final ObjectOutputStream oii;
     private final Queue<Events.Event> qin = new LinkedList<>();
     public GameRoom room;
@@ -24,7 +24,7 @@ public class ServerConnector {
         oii = new ObjectOutputStream(new BufferedOutputStream(out));
         oii.flush();
         out.flush(); // force flush
-        ois = new ObjectInputStream(new BufferedInputStream(s.getInputStream()));
+        inputStream = new ObjectInputStream(new BufferedInputStream(s.getInputStream()));
         netThreads.set(this);
     }
 
@@ -126,7 +126,7 @@ public class ServerConnector {
 
             try {
                 //prova a leggere dati dal socket
-                Object data = ois.readObject();
+                Object data = inputStream.readObject();
                 didSomething = true;
 
                 if (!(data instanceof Events.Event(int code, Object event))) {

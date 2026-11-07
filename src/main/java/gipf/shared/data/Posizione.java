@@ -2,6 +2,8 @@ package gipf.shared.data;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.*;
+
 import lombok.*;
 
 @Value
@@ -43,11 +45,12 @@ public class Posizione implements Serializable {
         }
     }
 
-    public boolean isAdjacent(Posizione o) {
-        if (!isValid() || o == null || !o.isValid()) return false;
+    public boolean isAdjacent(Posizione altro) {
+        if (!isValid() || altro == null || !altro.isValid()) return false;
 
-        int xDiff = x > o.x ? x - o.x : o.x - x;
-        int yDiff = y > o.x ? y - o.y : o.y - y;
+        //valore assoluto della differenza di ciascuna coordinata dei 2 punti
+        int xDiff = x > altro.x ? x - altro.x : altro.x - x;
+        int yDiff = y > altro.y ? y - altro.y : altro.y - y;
 
         // the vertical connection
         if (xDiff == 0 && yDiff == 2) return true;
@@ -59,6 +62,9 @@ public class Posizione implements Serializable {
         return false;
     }
 
+    public Posizione add(int dx, int dy) {
+        return new Posizione((short) (x + dx), (short) (y +dy));
+    }
 
     // -------------- Test things ----------------------
 

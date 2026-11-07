@@ -1,5 +1,7 @@
 package gipf.server;
 
+import gipf.shared.Events;
+import gipf.shared.data.*;
 import gipf.shared.data.EventData.MoveRequest;
 
 import java.util.*;
@@ -12,9 +14,12 @@ public class GameRoom {
     private static final Object roomsLock = new Object();
     public final String code;
     @Getter(onMethod_ = @Locked.Read)
-    private ServerConnector p1;
+    private ServerConnector bianco;
     @Getter(onMethod_ = @Locked.Read)
-    private ServerConnector p2;
+    private ServerConnector nero;
+    private boolean turnoBianco = true;
+    @Getter
+    private Tabellone board = new Tabellone();
 
     public static GameRoom getRoom(String code) {
         synchronized (roomsLock) {
@@ -25,8 +30,8 @@ public class GameRoom {
 
     @Locked.Read
     public ServerConnector getOtherPlayer(ServerConnector player) {
-        if (player == p1) return p2;
-        else if (player == p2) return p1;
+        if (player == bianco) return nero;
+        else if (player == nero) return bianco;
         else return null;
     }
 
@@ -46,12 +51,12 @@ public class GameRoom {
 
     @Locked.Write
     public boolean addPlayer(ServerConnector player) {
-        if (p1 == player || p2 == player) return false;
+        if (bianco == player || nero == player) return false;
 
-        if (p1 == null) {
-            p1 = player;
-        } else if (p2 == null) {
-            p2 = player;
+        if (bianco == null) {
+            bianco = player;
+        } else if (nero == null) {
+            nero = player;
         } else return false;
 
         player.room = this;
@@ -61,12 +66,12 @@ public class GameRoom {
     @Locked.Write
     public ServerConnector removeClient(ServerConnector remove) {
         ServerConnector ret;
-        if (remove == p1) {
-            p1 = null;
-            ret = p2;
-        } else if (remove == p2) {
-            p2 = null;
-            ret = p1;
+        if (remove == bianco) {
+            bianco = null;
+            ret = nero;
+        } else if (remove == nero) {
+            nero = null;
+            ret = bianco;
         } else {
             return null;
         }
@@ -83,7 +88,7 @@ public class GameRoom {
         ArrayList<String> ret = new ArrayList<>();
 
         rooms.forEach((code, room) -> {
-            if (room.p1 == null || room.p2 == null) {
+            if (room.bianco == null || room.nero == null) {
                 ret.add(code);
             }
         });
@@ -93,7 +98,53 @@ public class GameRoom {
 
     //------- Move logic -------
 
+    private void fail() {
+        Events.fire(Events.MOVE_RESPONSE, new EventData.MoveResponse(false, null));
+    }
+
     @Locked.Read
     public void move(MoveRequest move) {
+        // invalid data
+        if (move == null || move.cella() == null || move.direzione() == null) {
+            fail();
+            return;
+        }
+
+        if (ServerConnector.getCurrentConnector().equals(bianco) != turnoBianco) {
+            fail();
+            return;
+        }
+
+        final Posizione origine = move.cella(); //cella sul bordo in cui è stata inserita la pedina
+        final Posizione dir = move.direzione(); //cella verso cui la pedina si muove
+
+        if (!origine.isBorder() || dir.isBorder() || origine.isAdjacent(dir)) {
+            fail();
+            return;
+        }
+
+        int xOffset = dir.getX() - origine.getX();
+        int yOffset = dir.getY() - origine.getY();
+
+        Tabellone nuovo = new Tabellone(board);
+        Tabellone.StatoCella cellaPrecedente = turnoBianco ? Tabellone.StatoCella.BIANCO : Tabellone.StatoCella.NERO;
+        Posizione cella = dir;
+
+        while (!cella.isBorder() && cellaPrecedente != Tabellone.StatoCella.VUOTO) {
+            Tabellone.StatoCella cur = board.getCell(cella);
+            nuovo.setCell(cella, cellaPrecedente);
+            cellaPrecedente = cur;
+            cella = cella.add(xOffset, yOffset);
+        }
+
+        // tutta la riga è piena, mossa non accettabile
+        if (cella.isBorder()) {
+            fail();
+            return;
+        }
+
+        turnoBianco = !turnoBianco;
+        board = nuovo;
+        Events.fire(Events.MOVE_RESPONSE, new EventData.MoveResponse(true, nuovo));
     }
 }
