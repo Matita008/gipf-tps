@@ -54,5 +54,7 @@ public class ServerListeners {
         ServerConnector.manageEvent(Events.SERVER_CONNECTION_REJECTED, false);
         ServerConnector.manageEvent(Events.SERVER_LIST_ROOMS, false);
         ServerConnector.manageEvent(Events.SERVER_JOIN_ROOM_ACK, false);
+        ServerConnector.manageEvent(Events.GAME_END, true);
+        ServerConnector.manageEvent(Events.MOVE_RESPONSE, true);
     }
 }

@@ -12,7 +12,6 @@ import java.util.List;
  * Finestra principale della GUI per il gioco GIPF.
  */
 public class GipfBoardFrame extends JFrame {
-
     public GipfBoardFrame() {
         // Configurazione della finestra principale
         setTitle("Tabellone di Gioco GIPF");
