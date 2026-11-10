@@ -2,37 +2,54 @@ package gipf.client;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.geom.Ellipse2D;
-import java.awt.geom.Line2D;
-import java.awt.geom.Point2D;
+import java.awt.geom.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.awt.event.*;
 
 /**
  * Finestra principale della GUI per il gioco GIPF.
  */
 public class GipfBoardFrame extends JFrame {
+	private BoardPanel board;
     public GipfBoardFrame() {
         // Configurazione della finestra principale
         setTitle("Tabellone di Gioco GIPF");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(750, 800);
-        // Centra la finestra sullo schermo
         setLocationRelativeTo(null);
 
+        board=new BoardPanel();
         // Aggiunta del pannello di disegno del tabellone
-        add(new BoardPanel());
+        add(board);
+        this.gestisciMouse();
+        
     }
-
+    public void gestisciMouse(){ 
+    	this.addMouseListener(new MouseAdapter() { // assegno alla form il gestore del mouse
+    		public void mouseClicked(MouseEvent me) { // quando viene cliccato il mouse me => è il riferimento alla posizione del mouse
+    			//controllo correttezza della posizione del mouse
+    			
+    			board.mossa= new Point2D.Double(me.getX()-10, me.getY()-35); // mi salvo il clic
+    			repaint(); // ridisegno tutto
+    		}
+    	});
+    }
     public static void main(String[] args) {
-        EventQueue.invokeLater(() -> {
-            try {
-                //Gioco frame = new Gioco();
-                GipfBoardFrame  frame = new GipfBoardFrame();
+        EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                try {
+                    //Gioco frame = new Gioco();
+                	GipfBoardFrame  frame = new GipfBoardFrame ();
 
-                frame.setVisible(true);
-            } catch (Exception e) {
-                e.printStackTrace(System.err);
+                    // Centra la finestra sullo schermo
+                    frame.setLocationRelativeTo(null);
+                    frame.setVisible(true);
+                    
+                    
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         });
     }
@@ -42,14 +59,18 @@ public class GipfBoardFrame extends JFrame {
  * Pannello personalizzato per il disegno vettoriale del tabellone GIPF.
  */
 class BoardPanel extends JPanel {
+	
+	public Point2D.Double mossa=null; // coordinate del clic null perchè non ho ancora cliccato
+	
     public BoardPanel() {
         setBackground(Color.WHITE);
+        
+        
         
     }
 
     @Override
     protected void paintComponent(Graphics g) {
-        System.out.println("here");
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
 
@@ -82,7 +103,7 @@ class BoardPanel extends JPanel {
             g2.draw(new Line2D.Double(pStart, pEnd));
         }
 
-        // Direzione 2: Linee diagonali a 30� verso il basso (costante r)
+        // Direzione 2: Linee diagonali a 30° verso il basso (costante r)
         for (int r = -4; r <= 4; r++) {
             int qMin = Math.max(-4, r - 4);
             int qMax = Math.min(4, r + 4);
@@ -91,7 +112,7 @@ class BoardPanel extends JPanel {
             g2.draw(new Line2D.Double(pStart, pEnd));
         }
 
-        // Direzione 3: Linee diagonali a 30� verso l'alto (costante k = r - q)
+        // Direzione 3: Linee diagonali a 30° verso l'alto (costante k = r - q)
         for (int k = -4; k <= 4; k++) {
             int qMin = -4;
             while (qMin <= 4 && (k + qMin < getRMin(qMin) || k + qMin > getRMax(qMin))) {
@@ -112,7 +133,7 @@ class BoardPanel extends JPanel {
         // 2. DISEGNO DEL PERIMETRO INTERNO ED ESTERNO
         // ==========================================
 
-        // Perimetro dell'area di gioco principale (Hexagon interno, linea continua pi� spessa)
+        // Perimetro dell'area di gioco principale (Hexagon interno, linea continua più spessa)
         g2.setStroke(new BasicStroke(2.0f));
         Point2D.Double[] innerRing = getInnerRingPoints(centerX, centerY, spacing);
         for (int i = 0; i < innerRing.length; i++) {
@@ -184,12 +205,16 @@ class BoardPanel extends JPanel {
             g2.drawString(labelBottom, (float) (ptBottom.x - textWidthBottom / 2.0), (float) (ptBottom.y + 22));
             
         }
+        /*
         Point2D.Double p= getPointCoords(-2,-2,centerX, centerY, spacing);
         disegnaPedina(g2, (int) p.x, (int)p.y, Color.DARK_GRAY);
         Point2D.Double p2= getPointCoords(-1,-1,centerX, centerY, spacing);
         disegnaPedina(g2, (int) p2.x, (int)p2.y, Color.LIGHT_GRAY);
         Point2D.Double p3= getPointCoords(1,2,centerX, centerY, spacing);
         disegnaPedina(g2, (int) p3.x, (int)p3.y, Color.DARK_GRAY);
+        
+        
+        
         disegnaPedinaSuCampo(g2,4,4,true, centerX, centerY, spacing);
         disegnaPedinaSuCampo(g2,1,0,true, centerX, centerY, spacing);
         disegnaPedinaSuCampo(g2,1,1,false, centerX, centerY, spacing);
@@ -197,24 +222,40 @@ class BoardPanel extends JPanel {
         disegnaPedinaSuCampo(g2,-2,-4,true, centerX, centerY, spacing);
         disegnaPedinaSuCampo(g2,4,1,true, centerX, centerY, spacing);
         
+        */
+        Point2D.Double[] nere = new Point2D.Double[3];
+        Point2D.Double[] bianche = new Point2D.Double[5];
+        nere[0] = new Point2D.Double(-2,-2);
+        nere[1] = new Point2D.Double(1,2);
+        nere[2] = new Point2D.Double(1,1);
+        bianche[0] = new Point2D.Double(4,4);
+        bianche[1] = new Point2D.Double(1,0);
+        bianche[2] = new Point2D.Double(-2,0);
+        bianche[3] = new Point2D.Double(-2,-4);
+        bianche[4] = new Point2D.Double(4,1);
+        
+        disegna(g2,nere,bianche,centerX,centerY,spacing);
         
         disegnaRiserveGrafico (g2,12,10);
+        
+        if(mossa!=null) // se ho cliccato
+        disegnaPedina(g2,(int)mossa.getX(),(int)mossa.getY(),Color.cyan);
         
     }
 
     // --- METODI GEOMETRICI AUSILIARI ---
 
-    /// Calcola il raggio minimo della colonna q
+    // Calcola il raggio minimo della colonna q
     private int getRMin(int q) {
         return Math.max(-4, -4 + q);
     }
 
-    /// Calcola il raggio massimo della colonna q
+    // Calcola il raggio massimo della colonna q
     private int getRMax(int q) {
         return Math.min(4, 4 + q);
     }
 
-    /// Verifica se un punto appartiene al bordo esterno
+    // Verifica se un punto appartiene al bordo esterno
     private boolean isOuterPoint(int q, int r) {
         return q == -4 || q == 4 || r == getRMin(q) || r == getRMax(q);
     }
@@ -279,9 +320,11 @@ class BoardPanel extends JPanel {
     }
     // METODO PER DISEGNARE UNA PEDINA DATA LA SUA POSIZIONE RISPETTO AL CENTRO DEL CAMPO
     private void disegnaPedinaSuCampo(Graphics2D g2D, int posx, int posy, boolean bianco, double cx, double cy, double space){
-    	Color colore = bianco? Color.LIGHT_GRAY: Color.DARK_GRAY;
-    	Point2D.Double p = getPointCoords(posx, posy, cx, cy, space);
+    	
+    	Color colore = bianco==true? Color.LIGHT_GRAY: Color.DARK_GRAY;
+    	Point2D.Double p= getPointCoords(posx,posy,cx, cy, space);
         disegnaPedina(g2D, (int) p.x, (int)p.y, colore);
+        
     }
     
     private void disegnaRiserve(Graphics2D g2d, int nNere, int nBianche) {
@@ -305,8 +348,10 @@ class BoardPanel extends JPanel {
         g2d.setColor(Color.BLACK);
         g2d.drawString(Integer.toString(nBianche), getWidth() - 80-x, getHeight() - 80+y); // Contatore
     }
+    
 
     private void disegnaRiserveGrafico(Graphics2D g2d, int nNere, int nBianche) {
+    	
         for(int i=0;i<nNere;i++){
         	disegnaPedina(g2d, 60, 80+i*45, Color.DARK_GRAY);
         }
@@ -336,14 +381,41 @@ class BoardPanel extends JPanel {
         g2d.drawString(Integer.toString(nBianche), getWidth() - 60-x, 80+y); // Contatore
        
     }
-
-    /*DA IMPLEMETARE*/
-    private void ridisegna(){
+    
+    // funzione che prende due array di punti e disegna in quei punti le corrispettive pedine nere e bianche
+    public void disegna(Graphics2D g2d, Point2D.Double [] nere, Point2D.Double [] bianche, double cx, double cy, double spacing) {
+    	
+    	for(int i=0;i<nere.length;i++){
+    		
+    		disegnaPedinaSuCampo(g2d,(int) nere[i].getX(),(int) nere[i].getY(),false, cx, cy, spacing);
+    		
+    	}
+    	
+    	for(int i=0;i<bianche.length;i++){
+    		
+    		disegnaPedinaSuCampo(g2d,(int) bianche[i].getX(),(int) bianche[i].getY(),true, cx, cy, spacing);
+    		
+    	}
     	
     }
     
-    /*DA IMPLEMETARE*/
-    private void disegnaTutteLePedine() {
-
+    // disegna tutte le pedine bianche e nere e le riserve come definite nelle liste di Tabellone
+    public void disegna(Graphics2D g2d, Tabellone t, double cx, double cy, double spacing) {
+    	
+    	for(int i=0;i<t.nero.size();i++){
+    		
+    		disegnaPedinaSuCampo(g2d,t.nero.get(i).getX(),t.nero.get(i).getY(),false, cx, cy, spacing);
+    		
+    	}
+    	
+    	for(int i=0;i<t.bianco.size();i++){
+    		
+    		disegnaPedinaSuCampo(g2d,t.bianco.get(i).getX(),t.bianco.get(i).getY(),true, cx, cy, spacing);
+    		
+    	}
+    	
+    	disegnaRiserveGrafico (g2d,t.riserveBianco,t.riserveNero);
     }
+    
+   
 }
