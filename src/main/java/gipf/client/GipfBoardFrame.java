@@ -384,38 +384,24 @@ class BoardPanel extends JPanel {
     
     // funzione che prende due array di punti e disegna in quei punti le corrispettive pedine nere e bianche
     public void disegna(Graphics2D g2d, Point2D.Double [] nere, Point2D.Double [] bianche, double cx, double cy, double spacing) {
-    	
-    	for(int i=0;i<nere.length;i++){
-    		
+    	for(int i=0;i<nere.length;i++) {
     		disegnaPedinaSuCampo(g2d,(int) nere[i].getX(),(int) nere[i].getY(),false, cx, cy, spacing);
     		
     	}
     	
-    	for(int i=0;i<bianche.length;i++){
-    		
+    	for(int i=0;i<bianche.length;i++) {
     		disegnaPedinaSuCampo(g2d,(int) bianche[i].getX(),(int) bianche[i].getY(),true, cx, cy, spacing);
-    		
     	}
-    	
     }
     
     // disegna tutte le pedine bianche e nere e le riserve come definite nelle liste di Tabellone
     public void disegna(Graphics2D g2d, Tabellone t, double cx, double cy, double spacing) {
-    	
-    	for(int i=0;i<t.nero.size();i++){
-    		
-    		disegnaPedinaSuCampo(g2d,t.nero.get(i).getX(),t.nero.get(i).getY(),false, cx, cy, spacing);
-    		
+    	for(int i=0;i<t.nero.size();i++) {	disegnaPedinaSuCampo(g2d,t.nero.get(i).getX(),t.nero.get(i).getY(),false, cx, cy, spacing);
     	}
     	
-    	for(int i=0;i<t.bianco.size();i++){
-    		
-    		disegnaPedinaSuCampo(g2d,t.bianco.get(i).getX(),t.bianco.get(i).getY(),true, cx, cy, spacing);
+    	for(int i=0;i<t.bianco.size();i++){	disegnaPedinaSuCampo(g2d,t.bianco.get(i).getX(),t.bianco.get(i).getY(),true, cx, cy, spacing);
     		
     	}
-    	
     	disegnaRiserveGrafico (g2d,t.riserveBianco,t.riserveNero);
     }
-    
-   
 }
