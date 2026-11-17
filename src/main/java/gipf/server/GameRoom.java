@@ -18,8 +18,8 @@ public class GameRoom {
     @Getter(onMethod_ = @Locked.Read)
     private ServerConnector nero;
     private boolean turnoBianco = true;
-    @Getter
-    private Tabellone board = new Tabellone();
+    @Getter private Tabellone board = new Tabellone();
+    public boolean keep = false;
 
     public static GameRoom getRoom(String code) {
         synchronized (roomsLock) {
@@ -76,7 +76,7 @@ public class GameRoom {
             return null;
         }
 
-        if (ret == null) {
+        if (ret == null && !keep) {
             rooms.remove(code);
         }
         remove.room = null;
@@ -99,7 +99,7 @@ public class GameRoom {
     //------- Move logic -------
 
     private void fail() {
-        Events.fire(Events.MOVE_RESPONSE, new EventData.MoveResponse(false, null));
+        Events.fire(Events.MOVE_RESPONSE, new EventData.MoveResponse(false));
     }
 
     @Locked.Read
@@ -145,6 +145,7 @@ public class GameRoom {
 
         turnoBianco = !turnoBianco;
         board = nuovo;
-        Events.fire(Events.MOVE_RESPONSE, new EventData.MoveResponse(true, nuovo));
+        Events.fire(Events.MOVE_RESPONSE, new EventData.MoveResponse(true));
+        Events.fire(Events.BOARD_CHANGED, board);
     }
 }

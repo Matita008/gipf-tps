@@ -11,10 +11,10 @@ import lombok.*;
 
 public class ServerConnector {
     private static final ThreadLocal<ServerConnector> netThreads = new ThreadLocal<>();
-    private static final AtomicBoolean active = new AtomicBoolean(false);
-    private final AtomicBoolean connActive = new AtomicBoolean(true);
+    public static final AtomicBoolean active = new AtomicBoolean(false);
+    public final AtomicBoolean connActive = new AtomicBoolean(true);
     @Getter private static Thread listener;
-    private final ObjectInputStream inputStream;
+    private final ObjectInputStream ois;
     private final ObjectOutputStream oii;
     private final Queue<Events.Event> qin = new LinkedList<>();
     public GameRoom room;
@@ -24,8 +24,7 @@ public class ServerConnector {
         oii = new ObjectOutputStream(new BufferedOutputStream(out));
         oii.flush();
         out.flush(); // force flush
-        inputStream = new ObjectInputStream(new BufferedInputStream(s.getInputStream()));
-        netThreads.set(this);
+        ois = new ObjectInputStream(new BufferedInputStream(s.getInputStream()));
     }
 
     public static void init(ServerSocket sock) throws IOException {
@@ -96,7 +95,11 @@ public class ServerConnector {
         Events.Event e = new Events.Event(code, data);
 
         ServerConnector sth = netThreads.get();
-        if (sth == null) return;
+        if (sth == null) {
+            (new Throwable("stacktrace")).printStackTrace(System.err);
+            System.err.println("something fired an event without having set netThreads, check above stacktrace");
+            return;
+        }
 
         sth.qin.add(e);
         if (broadcastToRoom && sth.room != null) {
@@ -105,7 +108,6 @@ public class ServerConnector {
     }
 
     // metodo per inviare il primo evento dalla coda e/o ricevere un evento dal socket
-    @SuppressWarnings("DuplicatedCode") //need a bit of though (ThreadLocal with id to filter as events are run on caller thread?)
     boolean poolEvents() throws IOException {
         try {
             boolean didSomething = false;
@@ -126,12 +128,14 @@ public class ServerConnector {
 
             try {
                 //prova a leggere dati dal socket
-                Object data = inputStream.readObject();
+                Object data = ois.readObject();
                 didSomething = true;
 
                 if (!(data instanceof Events.Event(int code, Object event))) {
                     throw new AssertionError(); //TODO: how? (mitm)
                 }
+
+                netThreads.set(this); //ensure netThreads is set correctly so that any reply fired is handled correctly
                 Events.getEventByCode(code).fireUnsafe(event);
                 if (ServerMain.debugPackets) System.out.println("[NET] received: " + data);
             } catch (SocketTimeoutException | EOFException ignored) {

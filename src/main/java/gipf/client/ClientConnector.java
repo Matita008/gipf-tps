@@ -42,12 +42,19 @@ public class ClientConnector {
         inputStream = new ObjectInputStream(new BufferedInputStream(in));
 
         networkThread = new Thread(() -> {
+            int sockerErrorCount = 0;
             while (active.get() || !eventQueue.isEmpty()) {
                 try {
                     poolEvent();
+                    sockerErrorCount = 0;
                 } catch (Exception e) {
                     System.err.println("An error occurred in the network thread: " + e.getLocalizedMessage());
                     e.printStackTrace(System.err);
+                    if (e instanceof SocketException) sockerErrorCount++;
+                    if (sockerErrorCount > 10) {
+                        System.err.println("More than 10 socket error received, assuming server went offline, disconnecting");
+                        active.set(false);
+                    }
                 }
             }
             System.out.println("[NET] disconnected\n[NET]\tbye!");

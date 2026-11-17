@@ -1,4 +1,4 @@
-package gipf.tests.net;
+package gipf.tests;
 
 import gipf.shared.Events;
 
@@ -7,22 +7,27 @@ import java.util.Arrays;
 import lombok.*;
 import lombok.experimental.*;
 
+/**
+ * Class to keep test data & code
+ *
+ * <b>Use only from {@code gipf.tests.*}</b>
+ */
 @UtilityClass @FieldDefaults(level = AccessLevel.PUBLIC)
 public class TestData {
-    final int port = 12234;
+    public final int port = 12234;
 
     /**
      * Prints a debug message with the event name and data.
      */
     void printEvent(String name, Object data) {
-        System.out.println("[TEST] event " + name + " data: <" + data.getClass() + "> " + data);
+        System.out.println("[TEST] event " + name + " data: <" + (data == null ? "null" : data.getClass()) + "> " + data);
     }
 
     void handlePing(String type, Boolean resp) {
         System.out.println("[" + type + "] " + (resp ? "ping" : "pong"));
     }
 
-    void init() {
+    public void init() {
         // add to all events (with the help of some reflection magic) the printEvent handler
         Arrays.stream(Events.class.getFields())
                 .filter(f -> Modifier.isStatic(f.getModifiers()))

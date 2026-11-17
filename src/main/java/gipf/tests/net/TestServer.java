@@ -4,6 +4,8 @@ import gipf.server.*;
 import gipf.shared.Events;
 
 import java.net.ServerSocket;
+
+import gipf.tests.TestData;
 import lombok.*;
 
 /// A test server

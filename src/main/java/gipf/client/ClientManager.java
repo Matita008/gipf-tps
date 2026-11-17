@@ -4,7 +4,11 @@ import gipf.shared.Events;
 
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import gipf.shared.data.*;
 import lombok.experimental.*;
+
+import javax.swing.*;
 
 /**
  * Class to manage the
@@ -28,6 +32,11 @@ public class ClientManager {
         Events.CLIENT_JOIN_ROOM.fire(roomName);
     }
 
+    public void mossa(Posizione origine, Posizione direzione) {
+        var mossa = new EventData.MoveRequest(origine, direzione);
+        Events.MOVE_REQUEST.fire(mossa);
+    }
+
     public void registerListeners() {
         registerStreamedEvents();
 
@@ -47,16 +56,23 @@ public class ClientManager {
             }
         });
 
-        Events.SERVER_JOIN_ROOM_ACK.addHandler(e -> {
-            if (!e) {
+        Events.SERVER_JOIN_ROOM_ACK.addHandler(roomCode -> {
+            if (roomCode == null) {
                 if (joinRoomName == null) {
                     // someone else was faster, retry
                     Events.CLIENT_LIST_ROOMS.fire(null);
                 }
                 return;
             }
+
+            System.out.println("Joined room " + roomCode);
             joinRoomPending.set(false);
             joinRoomName = null;
+        });
+
+        Events.BOARD_CHANGED.addHandler(tab -> {
+            BoardPanel.t = tab;
+            SwingUtilities.invokeLater(() -> GipfBoardFrame.getFrame().repaint());
         });
     }
 

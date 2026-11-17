@@ -6,6 +6,7 @@ import java.io.Serializable;
 public class SharedConstants {
     public static final String version = "1.0.0";
     public static final InitPacket initPacket = Events.buildInitPacket();
+    public static int defaultPort = 5000;
 
     public record InitPacket(String version, int eventSize) implements Serializable {
         @Serial

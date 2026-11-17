@@ -13,11 +13,9 @@ public class EventData {
 
     @Value @RequiredArgsConstructor
     public static class MoveResponse implements Serializable {
-        @Serial private static final long serialVersionUID = -65461321L;
+        @Serial private static final long serialVersionUID = -987654321L;
         boolean success;
-        Tabellone nuovoTabellone;
-        @NonNull
-        List<Posizione> fixes = List.of();
+        @NonNull List<Posizione> fixes = List.of();
     }
 
     public enum GameResult {
