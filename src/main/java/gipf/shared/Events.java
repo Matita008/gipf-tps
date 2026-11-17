@@ -19,6 +19,7 @@ public final class Events {
     public final EventHandler<MoveRequest> MOVE_REQUEST = new EventHandler<>("MOVE_REQUEST");
     /** Fired by the server when a move is elaborated */
     public final EventHandler<MoveResponse> MOVE_RESPONSE = new EventHandler<>("MOVE_RESPONSE");
+    public final EventHandler<Tabellone> BOARD_CHANGED = new EventHandler<>("TABLE_CHANGED");
     /** fired by the server when the player turn ended */
     public final EventHandler<Object> TURN_END = new EventHandler<>("TURN_END");
     /** fired by the server when the game ends */
@@ -43,7 +44,7 @@ public final class Events {
     public final EventHandler<Object> CLIENT_LIST_ROOMS = new EventHandler<>("CLIENT_LIST_ROOMS");
     public final EventHandler<List<String>> SERVER_LIST_ROOMS = new EventHandler<>("SERVER_LIST_ROOMS");
     public final EventHandler<String> CLIENT_JOIN_ROOM = new EventHandler<>("CLIENT_JOIN_ROOM");
-    public final EventHandler<Boolean> SERVER_JOIN_ROOM_ACK = new EventHandler<>("SERVER_JOIN_ROOM_ACK");
+    public final EventHandler<String> SERVER_JOIN_ROOM_ACK = new EventHandler<>("SERVER_JOIN_ROOM_ACK");
 
     public static <T> void on(EventHandler<T> event, Consumer<T> handler) {
         event.addHandler(handler);

@@ -1,9 +1,8 @@
 package gipf.server;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.*;
 import java.util.function.Consumer;
 import java.util.stream.IntStream;
 import lombok.experimental.*;
@@ -31,8 +30,15 @@ public class ServerPool {
         if (connectionAdder == null) throw new IllegalStateException();
     }
 
+    public static void shutdown() {
+        connectionAdder = null;
+        for(var th : threads) {
+            th.active.set(false);
+        }
+    }
+
     private void initExecutor() {
-        String type = System.getProperty("gipf.poolType", "THREAD_PER_ROOM");
+        String type = System.getProperty("gipf.poolType", "");
         switch (type.toLowerCase()) {
             //singolo thread: tutti i socket usano lo stesso thread
             case "single_thread":
@@ -65,13 +71,14 @@ public class ServerPool {
                 break;
             // default: usa un thread separato per ciascun socket
             default:
-                if (!type.equalsIgnoreCase("thread_per_client")) {
-                    System.out.println("[INIT] Warning: gipf.poolType is set to an unknown value");
+                if (!type.equalsIgnoreCase("thread_per_client") && !type.isBlank()) {
+                    System.err.println("[INIT] Warning: gipf.poolType is set to an unknown value: " + type);
                 }
                 connectionAdder = client -> {
                     var th = new NettyThread();
                     th.addClient(client);
                     th.start();
+                    th.terminateOnEmpty = true;
                     threads.add(th);
                 };
                 break;
@@ -81,7 +88,7 @@ public class ServerPool {
     static {
         initExecutor();
         try {
-            idleWait = Integer.parseInt(System.getProperty("gipf.idleWait"));
+            idleWait = Integer.parseInt(System.getProperty("gipf.idleWait", "500" /*.5s*/));
         } catch (Exception e) {
             System.err.println("[INIT] `gipf.idleWait` non è valido: " + e.getClass() + ": " + e.getMessage());
             e.printStackTrace(System.err);
@@ -90,6 +97,8 @@ public class ServerPool {
 
     private class NettyThread extends Thread {
         final List<ServerConnector> threadClients = new CopyOnWriteArrayList<>(); //COWal: muuuu
+        public boolean terminateOnEmpty = false;
+        public final AtomicBoolean active = new AtomicBoolean(true);
 
         public NettyThread() {
             super(tg, "netty-" + threadCount.getAndIncrement());
@@ -102,24 +111,51 @@ public class ServerPool {
 
         @Override
         public void run() {
-            boolean didSomething = false;
-            //per ciascun socket
-            for (var client : threadClients) {
-                try {
-                    // prova a inviare/ricevere eventi
-                    didSomething |= client.poolEvents();
-                } catch (Exception e) {
-                    System.err.println("[NETTY] [" + getName() + "] Errore durante il polling degli eventi: " + e.getClass() + ": " + e.getMessage());
-                    e.printStackTrace(System.err);
+            while (active.get()) {
+                //if allowed and no clients are connected
+                if (terminateOnEmpty && threadClients.isEmpty()) {
+                    active.set(false);
+                    continue;
+                }
+
+                List<ServerConnector> toRemove = new LinkedList<>();
+                boolean didSomething = false;
+                //per ciascun socket
+                for (var client : threadClients) {
+                    try {
+                        // prova a inviare/ricevere eventi
+                        didSomething |= client.poolEvents();
+                    } catch (Exception e) {
+                        System.err.println("[NETTY] [" + getName() + "] Errore durante il polling degli eventi: " + e.getClass() + ": " + e.getMessage());
+                        e.printStackTrace(System.err);
+                    }
+
+                    if (!client.connActive.get()) {
+                        toRemove.add(client);
+                    }
+                }
+
+                for(var del : toRemove) {
+                    threadClients.remove(del);
+
+                    //remove from room
+                    if (del.room != null) {
+                        del.room.removeClient(del);
+                    }
+                }
+
+                //se nessun socket ha gestito alcun evento aspetta prima di rieseguire il ciclo
+                if (!didSomething) {
+                    try {
+                        Thread.yield();
+                        //noinspection BusyWait
+                        Thread.sleep(idleWait);
+                    } catch (InterruptedException ignored) { }
                 }
             }
 
-            //se nessun socket ha gestito alcun evento aspetta prima di rieseguire il ciclo
-            if (!didSomething) {
-                try {
-                    Thread.sleep(idleWait);
-                } catch (InterruptedException ignored) { }
-            }
+            active.set(false);
+            threads.remove(this);
         }
     }
 }

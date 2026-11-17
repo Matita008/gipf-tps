@@ -39,12 +39,18 @@ public class ServerListeners {
         Events.on(Events.CLIENT_JOIN_ROOM, code -> {
             if (ServerConnector.getCurrentConnector().room != null) {
                 // Client is already in a room
-                Events.fire(Events.SERVER_JOIN_ROOM_ACK, false);
+                Events.fire(Events.SERVER_JOIN_ROOM_ACK, null);
                 return;
             }
 
             boolean result = GameRoom.addPlayerToRoom(code, ServerConnector.getCurrentConnector());
-            Events.fire(Events.SERVER_JOIN_ROOM_ACK, result);
+            Events.fire(Events.SERVER_JOIN_ROOM_ACK, result? code : null);
+        });
+
+        Events.on(Events.MOVE_REQUEST, move -> {
+            GameRoom room = ServerConnector.getCurrentConnector().room;
+            if (room == null) return;
+            room.move(move);
         });
     }
 
@@ -55,6 +61,7 @@ public class ServerListeners {
         ServerConnector.manageEvent(Events.SERVER_LIST_ROOMS, false);
         ServerConnector.manageEvent(Events.SERVER_JOIN_ROOM_ACK, false);
         ServerConnector.manageEvent(Events.GAME_END, true);
-        ServerConnector.manageEvent(Events.MOVE_RESPONSE, true);
+        ServerConnector.manageEvent(Events.MOVE_RESPONSE, false);
+        ServerConnector.manageEvent(Events.BOARD_CHANGED, true);
     }
 }

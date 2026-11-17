@@ -15,8 +15,8 @@ public class Tabellone implements Serializable {
     public Tabellone() {
         bianco = new ArrayList<>();
         nero = new ArrayList<>();
-        riserveBianco = 0;
-        riserveNero = 0;
+        riserveBianco = 18;
+        riserveNero = 18;
     }
 
     public Tabellone(Tabellone o) {

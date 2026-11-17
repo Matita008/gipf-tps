@@ -2,6 +2,7 @@ package gipf.tests.net;
 
 import gipf.client.ClientConnector;
 import gipf.shared.Events;
+import gipf.tests.TestData;
 import lombok.*;
 
 import java.net.*;
